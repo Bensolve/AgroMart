@@ -1,12 +1,14 @@
 // app/index.tsx
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TextInput, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING } from '@/constants/theme';
 import CategoryCard from '@/components/CategoryCard';
 import ProductCard from '@/components/ProductCard';
 import { MOCK_PRODUCTS } from '@/data/products';
+import { useCart } from '@/context/CartContext'; // 1. Import our global cart system hook
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '🧺' },
@@ -19,8 +21,11 @@ const CATEGORIES = [
 ];
 
 export default function HomeScreen() {
-  // Use 'All' as the base default state layout configuration
+  const router = useRouter();
+  const { getCartCount } = useCart(); // 2. Extract out the total items counting state function
   const [activeCategory, setActiveCategory] = useState('All');
+
+  const cartItemsCount = getCartCount();
 
   // Simple clean filtering logic computed inline during layout cycles
   const filteredProducts = activeCategory === 'All'
@@ -34,10 +39,26 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         
-        {/* HEADER SECTION */}
+        {/* HEADER SECTION WITH CART BUTTON TRIGGER */}
         <View style={styles.headerContainer}>
-          <Text style={styles.headerSubtext}>📍 Accra, Ghana</Text>
-          <Text style={styles.headerTitle}>Fresh food from farmers</Text>
+          <View>
+            <Text style={styles.headerSubtext}>📍 Accra, Ghana</Text>
+            <Text style={styles.headerTitle}>Fresh food from farmers</Text>
+          </View>
+          
+          {/* 3. Render the interactive cart icon button linking to our basket view */}
+          <Pressable 
+            style={styles.cartHeaderButton} 
+            onPress={() => router.push('/cart' as any)}
+          >
+            <Text style={styles.cartHeaderIcon}>🛍️</Text>
+            {/* Show badge bubble counts dynamically ONLY when there are items selected */}
+            {cartItemsCount > 0 && (
+              <View style={styles.badgeIndicatorBubble}>
+                <Text style={styles.badgeCounterText}>{cartItemsCount}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
 
         {/* SEARCH BAR SECTION */}
@@ -106,6 +127,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
+    flexDirection: 'row',       // 👈 Sets title stack and bag button on the same horizontal axis
+    justifyContent: 'space-between', // 👈 Pushes texts to the left side and bag icon button to the extreme right
+    alignItems: 'center',
   },
   headerSubtext: {
     fontSize: 14,
@@ -117,6 +141,36 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
     marginTop: 4,
+  },
+  cartHeaderButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cartHeaderIcon: {
+    fontSize: 20,
+  },
+  badgeIndicatorBubble: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: COLORS.primary,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeCounterText: {
+    color: COLORS.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   searchWrapper: {
     paddingHorizontal: SPACING.md,

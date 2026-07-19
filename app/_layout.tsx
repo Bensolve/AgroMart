@@ -1,8 +1,9 @@
+// app/_layout.tsx
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-
+import { CartProvider } from '@/context/CartContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
@@ -14,11 +15,24 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
+      {/* 1. CartProvider wraps the single Stack so all screens can access the shopping cart */}
+      <CartProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          {/* Main Tab interface containing the standard home landing feed */}
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          
+          {/* Dynamic route for individual item detail views */}
+          <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+          
+          {/* Cart detail list & checkout calculation screen */}
+          <Stack.Screen name="cart" options={{ headerShown: false }} />
+          
+          {/* Preserved your original modal configuration screen */}
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        </Stack>
+        
+        <StatusBar style="auto" />
+      </CartProvider>
     </ThemeProvider>
   );
 }

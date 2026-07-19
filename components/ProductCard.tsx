@@ -3,19 +3,27 @@ import React from 'react';
 import { StyleSheet, Text, View, Image, Pressable } from 'react-native';
 import { COLORS, SPACING } from '@/constants/theme';
 import { Product } from '@/data/products';
+import { useRouter } from 'expo-router';
+import { useCart } from '@/context/CartContext';
 
 interface ProductCardProps {
   product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  
-  const handleAddPress = () => {
-    console.log(`[AgroMart MVP] Console Log: Pressed Add for "${product.name}"`);
-  };
+  const router = useRouter();
+  const { addToCart } = useCart();
+
+const handleCardPress = () => {
+  // Add 'as any' to bypass the temporary Expo Router type sync delay
+  router.push({
+    pathname: '/product/[id]' as any,
+    params: { id: product.id }
+  });
+};
 
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={handleCardPress}>
       {/* Remote Image Component with standard fallback color background */}
       <Image 
         source={{ uri: product.image }} 
@@ -36,7 +44,11 @@ export default function ProductCard({ product }: ProductCardProps) {
           <Text style={styles.price}>GH₵{product.price}</Text>
           
           <Pressable 
-            onPress={handleAddPress}
+            onPress={(e) => {
+              e.stopPropagation(); // 👈 Stops the card press navigation from firing when adding items
+              console.log(`[AgroMart MVP] Added 1 x "${product.name}" directly to the cart.`);
+              addToCart(product, 1); // 👈 Dispatches item to the global Cart Context state
+            }}
             style={({ pressed }) => [
               styles.addButton,
               pressed && styles.addButtonPressed
@@ -46,7 +58,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           </Pressable>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
