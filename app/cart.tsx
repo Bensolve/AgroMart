@@ -1,105 +1,134 @@
 // app/cart.tsx
 import React from 'react';
-import { StyleSheet, Text, View, Image, Pressable, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+
 import { COLORS, SPACING } from '@/constants/theme';
 import { useCart } from '@/context/CartContext';
 
+// Target phone number for the business (Ghana country code +233 as example)
+const WHATSAPP_NUMBER = '+233500000000'; 
+const DELIVERY_FEE = 20; // Fixed flat delivery rate for mock purposes
+
 export default function CartScreen() {
   const router = useRouter();
-  const { cartItems, updateQuantity, removeFromCart, getCartTotal } = useCart();
+  // Removed unused getCartCount to satisfy ESLint rule
+  const { cartItems, clearCart } = useCart(); 
 
-  const grandTotal = getCartTotal();
+  // 1. Calculate Financial Summaries using item.product.price
+  const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const grandTotal = subtotal > 0 ? subtotal + DELIVERY_FEE : 0;
+
+  // 2. WhatsApp Message Generator & Link Dispatcher
+  const handlePlaceOrder = async () => {
+    if (cartItems.length === 0) {
+      Alert.alert('Empty Basket', 'Please add items to your basket before checking out.');
+      return;
+    }
+
+    // Format individual product rows using item.product properties
+    const itemsSummary = cartItems
+      .map((item) => `• ${item.product.name} (${item.quantity}x) - GH₵${item.product.price * item.quantity}`)
+      .join('\n');
+
+    // Compose string template exactly matching business specifications
+    const textMessage = 
+`Hello AgroMart,
+I would like to order:
+${itemsSummary}
+
+Subtotal: GH₵${subtotal}
+Delivery Fee: GH₵${DELIVERY_FEE}
+Grand Total: GH₵${grandTotal}
+
+Delivery Address: 
+
+Thank you.`;
+
+    // Construct deep-link API URI strings
+    const whatsappUrl = `whatsapp://send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(textMessage)}`;
+    const webFallbackUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(textMessage)}`;
+
+    try {
+      // Validate device support for native application schema protocols
+      const canOpen = await Linking.canOpenURL(whatsappUrl);
+      
+      if (canOpen) {
+        await Linking.openURL(whatsappUrl);
+        clearCart(); // Safely empty cart workspace locally once handoff completes
+      } else {
+        // Fallback to web browser implementation if application client is missing
+        await Linking.openURL(webFallbackUrl);
+      }
+    } catch (error) {
+      // Log error to satisfy ESLint no-unused-vars rule
+      console.error('Failed to open link:', error);
+      Alert.alert(
+        'Connection Error',
+        'Could not open WhatsApp. Please check if the app is installed on your device.'
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Top toolbar navigation row block */}
+      {/* Navigation Header bar */}
       <View style={styles.headerNav}>
         <Pressable style={styles.iconCircleButton} onPress={() => router.back()}>
           <Text style={styles.navIconText}>⬅️</Text>
         </Pressable>
-        <Text style={styles.headerNavTitle}>Shopping Basket</Text>
+        <Text style={styles.headerNavTitle}>My Basket</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {cartItems.length > 0 ? (
-        <>
-          <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
+      {/* Cart Items Scroll Workspace */}
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {cartItems.length > 0 ? (
+          <View style={styles.itemsWrapper}>
             {cartItems.map((item) => (
-              <View key={item.product.id} style={styles.itemCardRow}>
-                <Image source={{ uri: item.product.image }} style={styles.itemImage} />
-                
-                <View style={styles.itemDetailsCol}>
-                  <View style={styles.itemHeaderTitleLine}>
-                    <Text style={styles.itemNameText} numberOfLines={1}>{item.product.name}</Text>
-                    <Pressable onPress={() => removeFromCart(item.product.id)} style={styles.trashPadding}>
-                      <Text style={styles.trashIconText}>🗑️</Text>
-                    </Pressable>
-                  </View>
-                  
-                  <Text style={styles.itemFarmerTag}>By {item.product.farmer}</Text>
-                  
-                  <View style={styles.itemQuantityControlLine}>
-                    <Text style={styles.itemPriceCalculation}>
-                      GH₵{item.product.price} × {item.quantity}
-                    </Text>
-                    
-                    {/* Inline Counter Increment Adjusters row */}
-                    <View style={styles.counterInlineRow}>
-                      <Pressable 
-                        style={styles.counterMiniBtn} 
-                        onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
-                      >
-                        <Text style={styles.counterMiniSign}>-</Text>
-                      </Pressable>
-                      <Text style={styles.counterMiniVal}>{item.quantity}</Text>
-                      <Pressable 
-                        style={styles.counterMiniBtn} 
-                        onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
-                      >
-                        <Text style={styles.counterMiniSign}>+</Text>
-                      </Pressable>
-                    </View>
-                  </View>
+              <View key={item.product.id} style={styles.cartItemCard}>
+                <View style={styles.itemMeta}>
+                  <Text style={styles.itemNameText}>{item.product.name}</Text>
+                  <Text style={styles.itemQuantifier}>
+                    {item.quantity} x GH₵{item.product.price}
+                  </Text>
                 </View>
+                <Text style={styles.itemTotalLine}>GH₵{item.product.price * item.quantity}</Text>
               </View>
             ))}
-          </ScrollView>
 
-          {/* Pricing Aggregations Summary layout pane */}
-          <View style={styles.summaryStickyBox}>
-            <View style={styles.summaryLabelRow}>
-              <Text style={styles.summaryLabelText}>Basket Subtotal</Text>
-              <Text style={styles.summaryValText}>GH₵{grandTotal}</Text>
+            {/* Price Calculations Breakdown Box */}
+            <View style={styles.summaryCardBox}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>GH₵{subtotal}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Delivery Fee</Text>
+                <Text style={styles.summaryValue}>GH₵{DELIVERY_FEE}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.summaryRow}>
+                <Text style={styles.totalLabel}>Grand Total</Text>
+                <Text style={styles.totalValue}>GH₵{grandTotal}</Text>
+              </View>
             </View>
-            <View style={styles.summaryLabelRow}>
-              <Text style={styles.summaryLabelText}>Delivery Logistics</Text>
-              <Text style={styles.summaryValGreenText}>FREE</Text>
-            </View>
-            
-            <View style={styles.summaryDividerLine} />
-            
-            <View style={styles.summaryLabelRow}>
-              <Text style={styles.grandTotalLabelText}>Grand Total</Text>
-              <Text style={styles.grandTotalValText}>GH₵{grandTotal}</Text>
-            </View>
-
-            <Pressable 
-              style={styles.checkoutActionBtn}
-              onPress={() => alert('Order generated! Thank you for supporting local Ghanaian farmers.')}
-            >
-              <Text style={styles.checkoutBtnText}>Proceed to Secure Checkout</Text>
-            </Pressable>
           </View>
-        </>
-      ) : (
-        <View style={styles.emptyContainerState}>
-          <Text style={styles.emptyBasketGraphicText}>🛒</Text>
-          <Text style={styles.emptyHeadingMessage}>Your basket is empty</Text>
-          <Text style={styles.emptySubMessage}>Explore our organic catalog to select fresh items directly from local family farmlands.</Text>
-          <Pressable style={styles.shopRedirectBtn} onPress={() => router.replace('/(tabs)')}>
-            <Text style={styles.shopRedirectBtnText}>Start Shopping</Text>
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🧺</Text>
+            <Text style={styles.emptyText}>Your basket is looking empty today.</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Sticky Bottom Actions Trigger Section */}
+      {cartItems.length > 0 && (
+        <View style={styles.stickyFooterContainer}>
+          <Pressable style={styles.primaryOrderButton} onPress={handlePlaceOrder}>
+            <Text style={styles.primaryButtonText}>Place Order via WhatsApp</Text>
+            <Text style={styles.whatsappIconCarrier}>💬</Text>
           </Pressable>
         </View>
       )}
@@ -110,7 +139,7 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   headerNav: {
     flexDirection: 'row',
@@ -120,7 +149,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
   },
   iconCircleButton: {
     width: 40,
@@ -138,180 +166,114 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
   },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
+  scrollContainer: {
+    paddingBottom: 120,
   },
-  itemCardRow: {
-    flexDirection: 'row',
+  itemsWrapper: {
+    padding: SPACING.md,
+  },
+  cartItemCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.border,
-    alignItems: 'center',
   },
-  itemImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
-    backgroundColor: COLORS.background,
-  },
-  itemDetailsCol: {
+  itemMeta: {
     flex: 1,
-    marginLeft: SPACING.md,
-  },
-  itemHeaderTitleLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   itemNameText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.textDark,
-    flex: 1,
   },
-  trashPadding: {
-    paddingLeft: SPACING.sm,
-    paddingVertical: 2,
-  },
-  trashIconText: {
-    fontSize: 16,
-  },
-  itemFarmerTag: {
-    fontSize: 12,
+  itemQuantifier: {
+    fontSize: 13,
     color: COLORS.textLight,
     marginTop: 2,
   },
-  itemQuantityControlLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: SPACING.xs,
-  },
-  itemPriceCalculation: {
-    fontSize: 14,
+  itemTotalLine: {
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.primary,
   },
-  counterInlineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  summaryCardBox: {
     backgroundColor: COLORS.background,
-    borderRadius: 8,
-    padding: 2,
-  },
-  counterMiniBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  counterMiniSign: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  counterMiniVal: {
-    paddingHorizontal: 10,
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textDark,
-  },
-  summaryStickyBox: {
-    backgroundColor: COLORS.white,
     padding: SPACING.md,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 14,
+    marginTop: SPACING.md,
   },
-  summaryLabelRow: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginVertical: 4,
   },
-  summaryLabelText: {
+  summaryLabel: {
     fontSize: 14,
     color: COLORS.textLight,
   },
-  summaryValText: {
+  summaryValue: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textDark,
   },
-  summaryValGreenText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  summaryDividerLine: {
+  divider: {
     height: 1,
     backgroundColor: COLORS.border,
     marginVertical: SPACING.sm,
   },
-  grandTotalLabelText: {
+  totalLabel: {
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.textDark,
   },
-  grandTotalValText: {
-    fontSize: 20,
+  totalValue: {
+    fontSize: 18,
     fontWeight: '800',
     color: COLORS.primary,
   },
-  checkoutActionBtn: {
-    backgroundColor: COLORS.primary,
+  emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: SPACING.md,
+    paddingVertical: 80,
   },
-  checkoutBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptyContainerState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyBasketGraphicText: {
-    fontSize: 64,
+  emptyIcon: {
+    fontSize: 48,
     marginBottom: SPACING.sm,
   },
-  emptyHeadingMessage: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textDark,
-    marginBottom: 6,
-  },
-  emptySubMessage: {
-    fontSize: 14,
+  emptyText: {
+    fontSize: 15,
     color: COLORS.textLight,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: SPACING.lg,
   },
-  shopRedirectBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
+  stickyFooterContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.white,
+    padding: SPACING.md,
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
   },
-  shopRedirectBtnText: {
+  primaryOrderButton: {
+    backgroundColor: '#25D366',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  primaryButtonText: {
     color: COLORS.white,
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: 14,
+    marginRight: 8,
+  },
+  whatsappIconCarrier: {
+    fontSize: 18,
   },
 });
