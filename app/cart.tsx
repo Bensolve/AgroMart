@@ -1,38 +1,33 @@
 // app/cart.tsx
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // 👈 Added useSafeAreaInsets
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING } from '@/constants/theme';
 import { useCart } from '@/context/CartContext';
 
-// Target phone number for the business (Ghana country code +233 as example)
 const WHATSAPP_NUMBER = '+233500000000'; 
-const DELIVERY_FEE = 20; // Fixed flat delivery rate for mock purposes
+const DELIVERY_FEE = 20;
 
 export default function CartScreen() {
   const router = useRouter();
-  // Removed unused getCartCount to satisfy ESLint rule
   const { cartItems, clearCart } = useCart(); 
+  const insets = useSafeAreaInsets(); // 👈 Detects phone's bottom navigation bar height
 
-  // 1. Calculate Financial Summaries using item.product.price
   const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const grandTotal = subtotal > 0 ? subtotal + DELIVERY_FEE : 0;
 
-  // 2. WhatsApp Message Generator & Link Dispatcher
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) {
       Alert.alert('Empty Basket', 'Please add items to your basket before checking out.');
       return;
     }
 
-    // Format individual product rows using item.product properties
     const itemsSummary = cartItems
       .map((item) => `• ${item.product.name} (${item.quantity}x) - GH₵${item.product.price * item.quantity}`)
       .join('\n');
 
-    // Compose string template exactly matching business specifications
     const textMessage = 
 `Hello AgroMart,
 I would like to order:
@@ -46,23 +41,19 @@ Delivery Address:
 
 Thank you.`;
 
-    // Construct deep-link API URI strings
     const whatsappUrl = `whatsapp://send?phone=${WHATSAPP_NUMBER}&text=${encodeURIComponent(textMessage)}`;
     const webFallbackUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(textMessage)}`;
 
     try {
-      // Validate device support for native application schema protocols
       const canOpen = await Linking.canOpenURL(whatsappUrl);
       
       if (canOpen) {
         await Linking.openURL(whatsappUrl);
-        clearCart(); // Safely empty cart workspace locally once handoff completes
+        clearCart(); 
       } else {
-        // Fallback to web browser implementation if application client is missing
         await Linking.openURL(webFallbackUrl);
       }
     } catch (error) {
-      // Log error to satisfy ESLint no-unused-vars rule
       console.error('Failed to open link:', error);
       Alert.alert(
         'Connection Error',
@@ -72,8 +63,8 @@ Thank you.`;
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Navigation Header bar */}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* Navigation Header */}
       <View style={styles.headerNav}>
         <Pressable style={styles.iconCircleButton} onPress={() => router.back()}>
           <Text style={styles.navIconText}>⬅️</Text>
@@ -82,8 +73,8 @@ Thank you.`;
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Cart Items Scroll Workspace */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      {/* Cart Items List */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {cartItems.length > 0 ? (
           <View style={styles.itemsWrapper}>
             {cartItems.map((item) => (
@@ -98,7 +89,7 @@ Thank you.`;
               </View>
             ))}
 
-            {/* Price Calculations Breakdown Box */}
+            {/* Price Calculations */}
             <View style={styles.summaryCardBox}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
@@ -123,9 +114,9 @@ Thank you.`;
         )}
       </ScrollView>
 
-      {/* Sticky Bottom Actions Trigger Section */}
+      {/* Sticky Bottom Actions Section with dynamic safe area padding */}
       {cartItems.length > 0 && (
-        <View style={styles.stickyFooterContainer}>
+        <View style={[styles.stickyFooterContainer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
           <Pressable style={styles.primaryOrderButton} onPress={handlePlaceOrder}>
             <Text style={styles.primaryButtonText}>Place Order via WhatsApp</Text>
             <Text style={styles.whatsappIconCarrier}>💬</Text>
@@ -167,7 +158,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   },
   scrollContainer: {
-    paddingBottom: 120,
+    paddingBottom: SPACING.md,
   },
   itemsWrapper: {
     padding: SPACING.md,
@@ -250,12 +241,9 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
   },
   stickyFooterContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
     borderColor: COLORS.border,
   },

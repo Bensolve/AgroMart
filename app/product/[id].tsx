@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, Image, Pressable, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // 👈 Added useSafeAreaInsets
 import { COLORS, SPACING } from '@/constants/theme';
 import { MOCK_PRODUCTS } from '@/data/products';
 import { useCart } from '@/context/CartContext';
@@ -12,8 +12,8 @@ export default function ProductDetailsScreen() {
   const router = useRouter();
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
+  const insets = useSafeAreaInsets(); // 👈 Detects phone's bottom navigation bar height
 
-  // Locate product matching context keys
   const product = MOCK_PRODUCTS.find(p => p.id === id);
 
   if (!product) {
@@ -32,12 +32,12 @@ export default function ProductDetailsScreen() {
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
-    router.back(); // Redirect back to marketplace screen directly upon completion
+    router.back();
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Dynamic Header Component navigation toolbar row */}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      {/* Dynamic Header Component */}
       <View style={styles.headerNav}>
         <Pressable style={styles.iconCircleButton} onPress={() => router.back()}>
           <Text style={styles.navIconText}>⬅️</Text>
@@ -46,7 +46,7 @@ export default function ProductDetailsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <Image source={{ uri: product.image }} style={styles.heroImage} resizeMode="cover" />
 
         <View style={styles.detailsContentBox}>
@@ -68,7 +68,7 @@ export default function ProductDetailsScreen() {
 
           <View style={styles.divider} />
 
-          {/* Quantity Selector Interface controls block */}
+          {/* Quantity Selector */}
           <View style={styles.quantitySection}>
             <Text style={styles.quantityLabelTitle}>Select Quantity</Text>
             <View style={styles.counterContainerRow}>
@@ -84,8 +84,8 @@ export default function ProductDetailsScreen() {
         </View>
       </ScrollView>
 
-      {/* Cart Submission Sticky Footer section */}
-      <View style={styles.stickyFooterContainer}>
+      {/* Sticky Footer with dynamic bottom padding */}
+      <View style={[styles.stickyFooterContainer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
         <Pressable style={styles.primaryCartSubmitButton} onPress={handleAddToCart}>
           <Text style={styles.primaryCartButtonText}>
             Add to Basket • GH₵{product.price * quantity}
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   },
   scrollContainer: {
-    paddingBottom: 100,
+    paddingBottom: SPACING.md,
   },
   heroImage: {
     width: '100%',
@@ -246,12 +246,9 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   },
   stickyFooterContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
     borderColor: COLORS.border,
   },
