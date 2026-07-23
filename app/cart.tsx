@@ -1,7 +1,7 @@
 // app/cart.tsx
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, Pressable, Alert, Linking } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'; // 👈 Added useSafeAreaInsets
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
 import { COLORS, SPACING } from '@/constants/theme';
@@ -12,9 +12,11 @@ const DELIVERY_FEE = 20;
 
 export default function CartScreen() {
   const router = useRouter();
-  const { cartItems, clearCart } = useCart(); 
-  const insets = useSafeAreaInsets(); // 👈 Detects phone's bottom navigation bar height
+  // Connected updateQuantity and removeFromCart from CartContext
+  const { cartItems, clearCart, updateQuantity, removeFromCart } = useCart(); 
+  const insets = useSafeAreaInsets();
 
+  // Financial totals calculate dynamically from live cartItems state
   const subtotal = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const grandTotal = subtotal > 0 ? subtotal + DELIVERY_FEE : 0;
 
@@ -73,23 +75,53 @@ Thank you.`;
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Cart Items List */}
+      {/* Cart Items List Workspace */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {cartItems.length > 0 ? (
           <View style={styles.itemsWrapper}>
             {cartItems.map((item) => (
               <View key={item.product.id} style={styles.cartItemCard}>
+                
+                {/* Left Side: Product Name & Quantity Controls */}
                 <View style={styles.itemMeta}>
                   <Text style={styles.itemNameText}>{item.product.name}</Text>
-                  <Text style={styles.itemQuantifier}>
-                    {item.quantity} x GH₵{item.product.price}
-                  </Text>
+                  <Text style={styles.itemUnitPrice}>GH₵{item.product.price} / unit</Text>
+                  
+                  {/* Quantity Adjustment Row (+ / -) */}
+                  <View style={styles.quantityControlsRow}>
+                    <Pressable 
+                      style={styles.qtyButton} 
+                      onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
+                    >
+                      <Text style={styles.qtyButtonText}>-</Text>
+                    </Pressable>
+
+                    <Text style={styles.qtyDisplayText}>{item.quantity}</Text>
+
+                    <Pressable 
+                      style={styles.qtyButton} 
+                      onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
+                    >
+                      <Text style={styles.qtyButtonText}>+</Text>
+                    </Pressable>
+                  </View>
                 </View>
-                <Text style={styles.itemTotalLine}>GH₵{item.product.price * item.quantity}</Text>
+
+                {/* Right Side: Trash Action & Item Total */}
+                <View style={styles.itemRightActionBox}>
+                  <Pressable 
+                    style={styles.deleteButton} 
+                    onPress={() => removeFromCart(item.product.id)}
+                  >
+                    <Text style={styles.deleteIconText}>🗑️</Text>
+                  </Pressable>
+                  <Text style={styles.itemTotalLine}>GH₵{item.product.price * item.quantity}</Text>
+                </View>
+
               </View>
             ))}
 
-            {/* Price Calculations */}
+            {/* Price Breakdown Calculations */}
             <View style={styles.summaryCardBox}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
@@ -114,7 +146,7 @@ Thank you.`;
         )}
       </ScrollView>
 
-      {/* Sticky Bottom Actions Section with dynamic safe area padding */}
+      {/* Sticky Bottom Actions Bar */}
       {cartItems.length > 0 && (
         <View style={[styles.stickyFooterContainer, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
           <Pressable style={styles.primaryOrderButton} onPress={handlePlaceOrder}>
@@ -182,10 +214,47 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textDark,
   },
-  itemQuantifier: {
-    fontSize: 13,
+  itemUnitPrice: {
+    fontSize: 12,
     color: COLORS.textLight,
     marginTop: 2,
+  },
+  quantityControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  qtyButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  qtyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+  qtyDisplayText: {
+    paddingHorizontal: SPACING.sm,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  itemRightActionBox: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  deleteButton: {
+    padding: 4,
+    marginBottom: SPACING.xs,
+  },
+  deleteIconText: {
+    fontSize: 16,
   },
   itemTotalLine: {
     fontSize: 16,

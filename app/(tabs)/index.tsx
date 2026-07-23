@@ -8,7 +8,7 @@ import { COLORS, SPACING } from '@/constants/theme';
 import CategoryCard from '@/components/CategoryCard';
 import ProductCard from '@/components/ProductCard';
 import { MOCK_PRODUCTS } from '@/data/products';
-import { useCart } from '@/context/CartContext'; // 1. Import our global cart system hook
+import { useCart } from '@/context/CartContext';
 
 const CATEGORIES = [
   { id: 'all', name: 'All', icon: '🧺' },
@@ -22,15 +22,31 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { getCartCount } = useCart(); // 2. Extract out the total items counting state function
+  const { getCartCount } = useCart();
+
+  // State hooks
   const [activeCategory, setActiveCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState(''); // 👈 Added missing state
 
   const cartItemsCount = getCartCount();
 
-  // Simple clean filtering logic computed inline during layout cycles
-  const filteredProducts = activeCategory === 'All'
-    ? MOCK_PRODUCTS
-    : MOCK_PRODUCTS.filter(product => product.category === activeCategory);
+  // Derive filtered products combining activeCategory and searchQuery
+  const filteredProducts = MOCK_PRODUCTS.filter((product) => {
+    // Check category match using activeCategory
+    const matchesCategory =
+      !activeCategory ||
+      activeCategory === 'All' ||
+      product.category.toLowerCase() === activeCategory.toLowerCase();
+
+    // Check search text match (case-insensitive)
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      query === '' ||
+      product.name.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query);
+
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -38,21 +54,18 @@ export default function HomeScreen() {
         style={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        
-        {/* HEADER SECTION WITH CART BUTTON TRIGGER */}
+        {/* HEADER SECTION */}
         <View style={styles.headerContainer}>
           <View>
             <Text style={styles.headerSubtext}>📍 Accra, Ghana</Text>
             <Text style={styles.headerTitle}>Fresh food from farmers</Text>
           </View>
           
-          {/* 3. Render the interactive cart icon button linking to our basket view */}
           <Pressable 
             style={styles.cartHeaderButton} 
             onPress={() => router.push('/cart' as any)}
           >
             <Text style={styles.cartHeaderIcon}>🛍️</Text>
-            {/* Show badge bubble counts dynamically ONLY when there are items selected */}
             {cartItemsCount > 0 && (
               <View style={styles.badgeIndicatorBubble}>
                 <Text style={styles.badgeCounterText}>{cartItemsCount}</Text>
@@ -67,10 +80,12 @@ export default function HomeScreen() {
             style={styles.searchInput}
             placeholder="Search vegetables, fruits..."
             placeholderTextColor={COLORS.textLight}
+            value={searchQuery} // 👈 Bound value to state
+            onChangeText={setSearchQuery} // 👈 Connected state updater
           />
         </View>
 
-        {/* HORIZONTAL CATEGORIES SCROLL SECTION */}
+        {/* HORIZONTAL CATEGORIES SECTION */}
         <View style={styles.categoriesSection}>
           <ScrollView 
             horizontal={true} 
@@ -91,20 +106,17 @@ export default function HomeScreen() {
 
         {/* VERTICAL PRODUCT LISTING SECTION */}
         <View style={styles.productsSection}>
-          <Text style={styles.sectionTitle}>
-            {activeCategory} Selection ({filteredProducts.length})
-          </Text>
-          
           {filteredProducts.length > 0 ? (
             filteredProducts.map((product) => (
-              <ProductCard 
-                key={product.id}
-                product={product}
-              />
+              <ProductCard key={product.id} product={product} />
             ))
           ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No farm products are available in this section today.</Text>
+            <View style={styles.emptySearchContainer}>
+              <Text style={styles.emptySearchIcon}>🔍</Text>
+              <Text style={styles.emptySearchTitle}>No products found</Text>
+              <Text style={styles.emptySearchSubtitle}>
+                Try checking for spelling errors or searching a different category.
+              </Text>
             </View>
           )}
         </View>
@@ -127,8 +139,8 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    flexDirection: 'row',       // 👈 Sets title stack and bag button on the same horizontal axis
-    justifyContent: 'space-between', // 👈 Pushes texts to the left side and bag icon button to the extreme right
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   headerSubtext: {
@@ -197,20 +209,25 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.lg,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textDark,
-    marginBottom: SPACING.md,
-  },
-  emptyContainer: {
+  emptySearchContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.lg,
+    paddingVertical: 40,
+    width: '100%',
   },
-  emptyText: {
-    fontSize: 14,
+  emptySearchIcon: {
+    fontSize: 36,
+    marginBottom: 8,
+  },
+  emptySearchTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  emptySearchSubtitle: {
+    fontSize: 13,
     color: COLORS.textLight,
     textAlign: 'center',
+    marginTop: 4,
   },
 });
